@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Simulasi KRS — instrumen penelitian
 
-## Getting Started
+Next.js (App Router) + PostgreSQL. Mensimulasikan war KRS (7 matkul, 20 SKS, target kelas A, kuota 5 per kelas,
+bentrok jadwal) sambil merekam _micro-measures_ widget dan SEQ per interaksi, SUS per ronde.
 
-First, run the development server:
+## Menjalankan
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local        # isi DATABASE_URL dan ADMIN_TOKEN
+docker compose up -d              # Postgres lokal (atau pakai Postgres sendiri)
+npm run dev                       # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Tabel dan kuota awal dibuat otomatis saat request pertama. Tidak ada langkah migrasi.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Sesi serentak lewat WiFi yang sama:** `npm run build && npm start -- -H 0.0.0.0`, lalu peserta membuka
+`http://<IP-laptop>:3000`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Alur peserta
 
-## Learn More
+Persetujuan + kode (P01, P02, …) → Ronde 1 → SUS → Ronde 2 → SUS → 2 pertanyaan akhir.
 
-To learn more about Next.js, take a look at the following resources:
+- Widget ditentukan sistem dari kode: kode ganjil mulai dropdown, genap mulai typing (counterbalancing).
+- Ronde 1 memakai katalog 1, ronde 2 katalog 2 (jadwal dan bentrok berbeda, kesulitan setara: 3 kelas A penuh
+  sejak awal, 2 pasang kelas A bentrok, maksimal 3 kelas A yang bisa diperoleh).
+- Urutan matkul bebas. Kuota diperebutkan nyata antar peserta (pengurangan atomik di Postgres).
+- Widget memuat semua 42 kelas (7 matkul × 6 kelas).
+- Peserta menekan "Mulai ronde" setelah aba-aba peneliti agar semua mulai bersamaan.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Panel peneliti (`/admin`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Masukkan `ADMIN_TOKEN`. **Reset kuota** sebelum tiap sesi, **Unduh CSV** setelahnya, **Hapus semua data** untuk
+membersihkan uji coba.
 
-## Deploy on Vercel
+## Data (CSV)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Satu baris = satu interaksi (satu kelas berhasil diambil). Kolom utama:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Target (y): `seq` (1–7)
+- Fitur: `dwell_hover_ms`, `mouse_trace_len`, `selections`, `options_display_ms`, `first_key_latency_ms`,
+  `keystrokes`, `misclicks`, `total_ms`, `attempts`, `fail_full`, `fail_conflict`
+- Kovariat: `widget`, `round`, `order_pos`, `reserved_before`, `a_full_at_pick`, `got_a`, `widget_first`
+- Validasi: `sus_score` (skor SUS ronde itu, diulang di tiap baris ronde yang sama)
+
+Untuk model, pisahkan data per partisipan (`GroupKFold` pada `pid`).
+
+## Hal yang perlu Anda putuskan atau periksa
+
+1. **Butir SUS** di `src/lib/sus.ts` masih terjemahan sementara. Ganti dengan versi Indonesia yang tervalidasi.
+2. **Jumlah peserta**: tiap matkul berkapasitas 30 kursi (5 × 6), sehingga aman untuk sampai sekitar 24 peserta.
+3. `npm run seeds` mencari ulang seed katalog bila Anda mengubah jumlah matkul, kelas, atau jadwal.
+4. `npm run e2e` menguji API (kuota serentak, bentrok, SUS, CSV) terhadap server yang sedang berjalan.
