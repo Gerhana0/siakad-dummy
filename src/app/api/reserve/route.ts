@@ -1,5 +1,5 @@
 import { pool, ready } from "@/lib/db";
-import { clash, courseName, getCatalog, isA } from "@/lib/catalog";
+import { CONDITION, clash, courseName, getCatalog, isA } from "@/lib/catalog";
 
 export async function POST(req: Request) {
   await ready();
@@ -8,6 +8,7 @@ export async function POST(req: Request) {
   const cat = getCatalog(round);
   const cls = cat.find((c) => c.key === classKey);
   if (!cls) return Response.json({ ok: false, reason: "error" }, { status: 400 });
+  const war = CONDITION[round as 1 | 2] === "war";
 
   const client = await pool.connect();
   try {
@@ -39,19 +40,33 @@ export async function POST(req: Request) {
     }
 
     // Status kelas A (A1 dan A2) matkul ini saat dicoba (untuk analisis "A penuh vs tersedia").
-    const aKeys = cat.filter((c) => c.course === cls.course && isA(c.code)).map((c) => c.key);
-    const a = await client.query("SELECT taken, quota FROM class_slots WHERE class_key = ANY($1)", [aKeys]);
-    const aFull = a.rows.length > 0 && a.rows.every((r) => r.taken >= r.quota);
+    const aClasses = cat.filter((c) => c.course === cls.course && isA(c.code));
+    let aFull: boolean;
+    if (war) {
+      const a = await client.query("SELECT taken, quota FROM class_slots WHERE class_key = ANY($1)", [
+        aClasses.map((c) => c.key),
+      ]);
+      aFull = a.rows.length > 0 && a.rows.every((r) => r.taken >= r.quota);
+    } else {
+      // Santai: kuota privat, jadi hanya kursi yang penuh sejak awal yang tidak tersedia.
+      aFull = aClasses.every((c) => c.initialTaken >= c.quota);
+    }
 
-    // Pengurangan kuota atomik: hanya berhasil bila masih ada kursi.
-    const up = await client.query(
-      "UPDATE class_slots SET taken = taken + 1 WHERE class_key=$1 AND taken < quota RETURNING taken",
-      [classKey]
-    );
-    if (!up.rowCount) {
+    if (war) {
+      // Pengurangan kuota atomik: hanya berhasil bila masih ada kursi.
+      const up = await client.query(
+        "UPDATE class_slots SET taken = taken + 1 WHERE class_key=$1 AND taken < quota RETURNING taken",
+        [classKey]
+      );
+      if (!up.rowCount) {
+        await client.query("ROLLBACK");
+        return Response.json({ ok: false, reason: "full", aFull });
+      }
+    } else if (cls.initialTaken >= cls.quota) {
       await client.query("ROLLBACK");
       return Response.json({ ok: false, reason: "full", aFull });
     }
+
     await client.query(
       "INSERT INTO reservations (pid, catalog, course_code, class_key) VALUES ($1,$2,$3,$4)",
       [pid, round, cls.course, classKey]

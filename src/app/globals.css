@@ -778,6 +778,32 @@ textarea.field {
   font-size: 13px;
 }
 
+.confirm-modal {
+  width: min(520px, 100%);
+  background: #fff;
+}
+.confirm-table {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 12px 16px;
+  margin: 4px 0 20px;
+}
+.confirm-table dt {
+  color: var(--muted);
+}
+.confirm-table dd {
+  margin: 0;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.btn-ghost.lg {
+  padding: 11px 18px;
+  font-size: 15px;
+}
+
 /* ---------- Halaman tengah (consent, SUS, akhir) ---------- */
 .centered {
   display: flex;

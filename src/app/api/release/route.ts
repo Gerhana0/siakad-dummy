@@ -1,4 +1,5 @@
 import { pool, ready } from "@/lib/db";
+import { CONDITION } from "@/lib/catalog";
 
 export async function POST(req: Request) {
   await ready();
@@ -10,7 +11,8 @@ export async function POST(req: Request) {
       "UPDATE reservations SET active=false WHERE pid=$1 AND catalog=$2 AND class_key=$3 AND active RETURNING id",
       [pid, round, classKey]
     );
-    if (r.rowCount) {
+    // Kursi dikembalikan hanya pada ronde war (ronde santai memakai kuota privat).
+    if (r.rowCount && CONDITION[round as 1 | 2] === "war") {
       await client.query("UPDATE class_slots SET taken = GREATEST(taken - 1, 0) WHERE class_key=$1", [
         classKey,
       ]);

@@ -73,4 +73,5 @@ CREATE TABLE IF NOT EXISTS feedback (
 ALTER TABLE interactions ADD COLUMN IF NOT EXISTS widget_type text;
 ALTER TABLE interactions ADD COLUMN IF NOT EXISTS wrong_pick int;
 ALTER TABLE interactions ALTER COLUMN class_code DROP NOT NULL;
+ALTER TABLE interactions ADD COLUMN IF NOT EXISTS condition text;
 `;

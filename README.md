@@ -19,18 +19,22 @@ Tabel dan kuota awal dibuat otomatis saat request pertama. Tidak ada langkah mig
 
 ## Alur peserta
 
-Persetujuan + kode (P01, P02, …) → Ronde 1 → SUS → Ronde 2 → SUS → 1 pertanyaan terbuka.
+Persetujuan + kode (P01, P02, …) → Ronde 1 (santai) → SUS → Ronde 2 (war) → SUS → 1 pertanyaan terbuka.
+
+- **Ronde 1, santai:** kuota privat per peserta (tidak diperebutkan), peserta mulai kapan saja.
+- **Ronde 2, war:** kuota dibagi semua peserta, siapa cepat dia dapat; mulai bersamaan setelah aba-aba peneliti.
+- Kolom `condition` (santai/war) diisi server berdasarkan ronde.
 
 - Tampilan meniru halaman Input KRS SIAKAD (referensi di `docs/referensi UI/`), dengan identitas netral.
 - Setiap mata kuliah diambil lewat dua widget, dan **SEQ ditanyakan setelah tiap widget**:
   1. **Pilih mata kuliah** (`course_picker`): modal berisi kolom cari dan grid kartu 39 mata kuliah.
      Memilih matkul di luar paket menampilkan pesan dan dicatat sebagai `wrong_pick`.
   2. **Pilih jadwal kelas** (`class_picker`): kartu radio kelas A1/A2/B1/B2 dengan kuota langsung
-     ("Terisi x dari 40 kursi"). Kelas bentrok dan penuh dinonaktifkan.
-- Tiap ronde memakai paket 6 matkul yang berbeda. Kursi dibuat langka: kelas A tersisa 2–4 kursi, kelas B
-  11–13 kursi, dan 2 matkul kelas A-nya penuh sejak awal. Aman untuk sampai sekitar 20 peserta.
+     ("Terisi x dari y kursi"). Kelas bentrok dan penuh dinonaktifkan. "Tambahkan ke KRS" membuka modal
+     "Konfirmasi mata kuliah"; kursi baru diambil saat "Simpan" ditekan.
+- Tiap ronde memakai paket 6 matkul yang berbeda. Kuota adalah jumlah kursi sebenarnya dan semua kosong di awal:
+  kelas A 3 kursi (langka), kelas B 12 kursi, dan 2 matkul kelas A-nya penuh sejak awal. Aman sampai sekitar 24 peserta.
 - Urutan matkul bebas. Kuota diperebutkan nyata antar peserta (pengurangan atomik di Postgres).
-- Peserta menekan "Mulai ronde" setelah aba-aba peneliti agar semua mulai bersamaan.
 
 ## Panel peneliti (`/admin`)
 
@@ -45,7 +49,7 @@ Satu baris = satu interaksi pada satu widget (`widget_type`: `course_picker` ata
 - Fitur: `dwell_hover_ms`, `mouse_trace_len`, `selections`, `options_display_ms` (lama modal terbuka; -1 untuk
   `class_picker`), `first_key_latency_ms`, `keystrokes`, `misclicks`, `total_ms`, `attempts`, `fail_full`,
   `fail_conflict` (termasuk klik pada kelas yang dinonaktifkan), `wrong_pick`
-- Kovariat: `widget_type`, `round`, `order_pos`, `reserved_before`, `a_full_at_pick`, `got_a`
+- Kovariat: `widget_type`, `condition`, `round`, `order_pos`, `reserved_before`, `a_full_at_pick`, `got_a`
 - Validasi: `sus_score` (skor SUS ronde itu, diulang di tiap baris ronde yang sama)
 
 Untuk model, pisahkan data per partisipan (`GroupKFold` pada `pid`).
@@ -53,6 +57,6 @@ Untuk model, pisahkan data per partisipan (`GroupKFold` pada `pid`).
 ## Hal yang perlu Anda putuskan atau periksa
 
 1. **Butir SUS** di `src/lib/sus.ts` masih terjemahan sementara. Ganti dengan versi Indonesia yang tervalidasi.
-2. **Jumlah peserta**: sisa kursi diatur di `SEATS_LEFT` pada `src/lib/catalog.ts` (saat ini aman sampai sekitar 20 peserta).
+2. **Jumlah peserta**: kuota diatur di `QUOTA` pada `src/lib/catalog.ts` (A1 + A2 = 6 kursi, B1 + B2 = 24 kursi; aman sampai sekitar 24 peserta). Kalau kuota diubah, kursi terisi otomatis di-reset saat server start.
 3. `npm run seeds` mencari ulang seed katalog bila Anda mengubah paket matkul, kelas, atau sesi.
 4. `npm run e2e` menguji API (kuota serentak, bentrok, SUS, CSV) terhadap server yang sedang berjalan. **Menghapus semua data.**

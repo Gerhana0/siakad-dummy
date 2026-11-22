@@ -26,6 +26,7 @@ const PATHS: Record<string, string> = {
   briefcase: "M3 8h18v11H3zM8 8V5h8v3M3 13h18",
   doc: "M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h4",
   check: "M5 12l5 5 9-10",
+  save: "M5 4h14v16H5zM12 8v7M8.5 11.5L12 15l3.5-3.5",
   cap: "M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5M22 9v6",
 };
 

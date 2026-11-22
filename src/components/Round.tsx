@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Cls, Course, TARGETS, courseSks, findCourse, getCatalog, isA } from "@/lib/catalog";
+import { CONDITION, Cls, Course, TARGETS, courseSks, findCourse, getCatalog, isA } from "@/lib/catalog";
 import { postJson } from "@/lib/api";
 import CoursePicker, { CoursePick } from "./CoursePicker";
 import SchedulePicker, { ClassPick, TryResult } from "./SchedulePicker";
@@ -27,6 +27,7 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
   const classes = useMemo(() => getCatalog(round), [round]);
   const targets = TARGETS[round];
   const targetSks = targets.reduce((s, c) => s + courseSks(c), 0);
+  const war = CONDITION[round] === "war";
 
   const [taken, setTaken] = useState<Record<string, number>>(() =>
     Object.fromEntries(classes.map((c) => [c.key, c.initialTaken]))
@@ -52,6 +53,7 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
     if (t) setTaken((x) => ({ ...x, ...t }));
   };
   useEffect(() => {
+    if (!war) return; // santai: kuota privat, tidak perlu dipantau
     let on = true;
     const tick = () =>
       fetchSlots().then((t) => {
@@ -63,12 +65,16 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
       on = false;
       clearInterval(id);
     };
-  }, [fetchSlots]);
+  }, [fetchSlots, war]);
 
   const mine = classes.filter((c) => reserved.includes(c.key));
   const takenCourses = new Set(mine.map((c) => c.course));
   const sks = mine.reduce((s, c) => s + courseSks(c.course), 0);
   const complete = targets.every((t) => takenCourses.has(t));
+  // Kursi terisi yang ditampilkan. War: dari server (dibagi semua peserta). Santai: kuota awal + diri sendiri.
+  const shownTaken = war
+    ? taken
+    : Object.fromEntries(classes.map((c) => [c.key, c.initialTaken + (reserved.includes(c.key) ? 1 : 0)]));
 
   const onTry = async (c: Cls): Promise<TryResult> =>
     (await postJson<TryResult>("/api/reserve", { pid, round, classKey: c.key }, 1)) ?? {
@@ -165,8 +171,10 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
           <Icon name="bulb" size={18} />
           <div>
             Pilih mata kuliah, pilih jadwal kelasnya, lalu tambahkan ke KRS. Ambil <b>semua</b> mata kuliah
-            paket di bawah dan <b>usahakan kelas A (A1/A2)</b>. Kuota kelas dibagi dengan peserta lain secara
-            langsung.
+            paket di bawah dan <b>usahakan kelas A (A1/A2)</b>.{" "}
+            {war
+              ? "Kuota kelas dibagi dengan peserta lain secara langsung: siapa cepat dia dapat."
+              : "Pada ronde ini kuota tidak diperebutkan, jadi kerjakan dengan santai."}
             <div className="paket">
               {targets.map((t) => (
                 <span key={t} className={`paket-item${takenCourses.has(t) ? " is-done" : ""}`}>
@@ -201,7 +209,7 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
             course={course}
             classes={course ? classes.filter((c) => c.course === course.code) : []}
             mine={mine}
-            taken={taken}
+            taken={shownTaken}
             locked={!!pending}
             onTry={onTry}
             onSuccess={onPickClass}
@@ -214,7 +222,7 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
           <h2>
             <Icon name="checklist" /> KRS Anda
           </h2>
-          <button type="button" className="btn-ghost" onClick={loadSlots}>
+          <button type="button" className="btn-ghost" onClick={war ? loadSlots : undefined}>
             <Icon name="refresh" size={16} /> Muat ulang
           </button>
         </div>

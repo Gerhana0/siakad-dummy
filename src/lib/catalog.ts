@@ -55,6 +55,13 @@ export const POOL: Course[] = [
   { code: "23013220330", name: "Data Mining", sks: 3 },
 ];
 
+/**
+ * Kondisi tiap ronde. Santai: kuota privat per peserta (tidak diperebutkan).
+ * War: kuota dibagi semua peserta dan diperebutkan secara langsung.
+ */
+export type Condition = "santai" | "war";
+export const CONDITION: Record<1 | 2, Condition> = { 1: "santai", 2: "war" };
+
 /** Paket KRS (mata kuliah yang wajib diambil) per ronde. */
 export const TARGETS: Record<1 | 2, string[]> = {
   1: ["23013120313", "23013120314", "23013120321", "23013120322", "23013120231", "23013120203"],
@@ -73,17 +80,16 @@ export const sessionLabel = (slot: number) => `Sesi ${SESSIONS[slot].join(",")}`
 export const CLASS_CODES = ["A1", "A2", "B1", "B2"];
 export const isA = (classCode: string) => classCode.startsWith("A");
 
-export const QUOTA = 40;
 /**
- * Sisa kursi saat ronde dimulai. Kuota tampil "x dari 40" agar realistis, tetapi sisa kursi dibuat
- * sedikit supaya benar-benar diperebutkan. Kelas A sengaja paling langka. Total sisa kursi per
- * matkul (kelas B saja, bila kelas A penuh) >= 22, jadi aman untuk sampai sekitar 20 peserta.
+ * Kuota kelas = jumlah kursi sebenarnya, semua kosong di awal ronde. Kelas A sengaja langka
+ * (A1 + A2 = 6 kursi) supaya diperebutkan. Kelas B (B1 + B2 = 24 kursi) menjamin setiap peserta
+ * kebagian kelas, jadi aman untuk sampai sekitar 24 peserta.
  */
-export const SEATS_LEFT = { A: [2, 4], B: [11, 13] } as const;
+export const QUOTA = { A: 3, B: 12 } as const;
 export const PREFULL = 2; // jumlah matkul yang semua kelas A-nya sudah penuh sejak awal
 
 // Seed hasil scripts/find-seeds.ts (tingkat kesulitan kedua set dibuat setara).
-export const SEEDS: Record<1 | 2, number> = { 1: 100114, 2: 200166 };
+export const SEEDS: Record<1 | 2, number> = { 1: 100045, 2: 200293 };
 
 export function rng(seed: number) {
   let a = seed >>> 0;
@@ -105,24 +111,21 @@ function shuffle<T>(arr: T[], r: () => number): T[] {
   return x;
 }
 
-const between = (r: () => number, [lo, hi]: readonly [number, number]) =>
-  lo + Math.floor(r() * (hi - lo + 1));
-
 export function generate(seed: number, no: 1 | 2): Cls[] {
   const r = rng(seed);
   const full = new Set(shuffle(TARGETS[no], r).slice(0, PREFULL));
   return TARGETS[no].flatMap((course) =>
     CLASS_CODES.map((code) => {
       const a = isA(code);
-      const left = between(r, a ? SEATS_LEFT.A : SEATS_LEFT.B);
+      const quota = a ? QUOTA.A : QUOTA.B;
       return {
         key: `${no}-${course}-${code}`,
         course,
         code,
         day: Math.floor(r() * DAYS.length),
         slot: Math.floor(r() * SESSIONS.length),
-        quota: QUOTA,
-        initialTaken: a && full.has(course) ? QUOTA : QUOTA - left,
+        quota,
+        initialTaken: a && full.has(course) ? quota : 0,
       };
     })
   );

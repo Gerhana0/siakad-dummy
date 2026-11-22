@@ -4,6 +4,7 @@ import Round from "@/components/Round";
 import SusForm from "@/components/SusForm";
 import Shell, { Brand, ProfileCard } from "@/components/Shell";
 import { postJson } from "@/lib/api";
+import { CONDITION } from "@/lib/catalog";
 import { Stage } from "@/lib/util";
 
 type Participant = {
@@ -93,19 +94,33 @@ export default function Home() {
 
   if (round) {
     return (
-      <Shell title="Input KRS" crumbs={["Registrasi", "KRS"]} badge={`Ronde ${round} dari 2`}>
+      <Shell
+        title="Input KRS"
+        crumbs={["Registrasi", "KRS"]}
+        badge={`Ronde ${round} dari 2 · ${CONDITION[round] === "war" ? "War KRS" : "Santai"}`}
+      >
         <ProfileCard pid={p.pid} />
         {!started[round] ? (
           <div className="card start-card">
-            <h2>Ronde {round} dari 2</h2>
+            <h2>
+              Ronde {round} dari 2: {CONDITION[round] === "war" ? "War KRS" : "Santai"}
+            </h2>
             <p>
-              Isi KRS dengan semua mata kuliah paket dan usahakan mendapat kelas A. Kuota kelas dibagi dengan
-              peserta lain, jadi siapa cepat dia dapat. Setiap selesai satu langkah, Anda akan diminta menilai
-              seberapa mudah langkah tersebut.
+              Isi KRS dengan semua mata kuliah paket dan usahakan mendapat kelas A. Setiap selesai satu
+              langkah, Anda akan diminta menilai seberapa mudah langkah tersebut.
             </p>
-            <p>
-              <b>Tunggu aba-aba peneliti</b>, lalu tekan tombol di bawah agar semua peserta mulai bersamaan.
-            </p>
+            {CONDITION[round] === "war" ? (
+              <p>
+                Pada ronde ini <b>kuota kelas dibagi dengan semua peserta</b>: siapa cepat dia dapat, seperti war
+                KRS sungguhan. <b>Tunggu aba-aba peneliti</b>, lalu tekan tombol di bawah agar semua peserta mulai
+                bersamaan.
+              </p>
+            ) : (
+              <p>
+                Pada ronde ini <b>kuota tidak diperebutkan</b> dengan peserta lain. Kerjakan dengan santai, dan
+                mulai kapan saja Anda siap.
+              </p>
+            )}
             <button className="btn" onClick={() => setStarted({ ...started, [round]: true })}>
               Mulai ronde {round}
             </button>

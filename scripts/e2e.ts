@@ -8,22 +8,22 @@ const assert = (c: boolean, m: string) => { console.log(c ? "PASS" : "FAIL", m);
 
 (async () => {
   await fetch(B + `/api/admin/reset?token=${TOKEN}&all=1`, { method: "POST" });
-  const cat = getCatalog(1);
+  const cat = getCatalog(2); // ronde 2 = war (kuota diperebutkan)
   const pids = Array.from({ length: 12 }, (_, i) => `P${String(i + 1).padStart(2, "0")}`);
   await Promise.all(pids.map((pid) => post("/api/participant", { pid })));
 
-  // 1) 12 peserta rebut satu kelas A yang belum penuh -> tepat sebanyak sisa kursi yang berhasil
+  // 1) WAR: 12 peserta rebut satu kelas A yang belum penuh -> tepat sebanyak sisa kursi yang berhasil
   const openA = cat.find((c) => isA(c.code) && c.initialTaken < c.quota)!;
   const left = openA.quota - openA.initialTaken;
-  const rs = await Promise.all(pids.map((pid) => post("/api/reserve", { pid, round: 1, classKey: openA.key })));
+  const rs = await Promise.all(pids.map((pid) => post("/api/reserve", { pid, round: 2, classKey: openA.key })));
   const ok = rs.filter((r) => r.ok).length, full = rs.filter((r) => r.reason === "full").length;
   assert(ok === left && full === 12 - left, `kuota atomik: ${ok} berhasil, ${full} penuh (harus ${left} dan ${12 - left})`);
-  const slots = await (await fetch(B + "/api/slots?catalog=1")).json();
+  const slots = await (await fetch(B + "/api/slots?catalog=2")).json();
   assert(slots.taken[openA.key] === openA.quota, `slots menampilkan ${openA.quota}/${openA.quota}`);
 
   // 2) kelas A yang sudah penuh sejak awal (A1 dan A2 penuh -> aFull)
   const preFull = cat.find((c) => isA(c.code) && c.initialTaken === c.quota)!;
-  const r2 = await post("/api/reserve", { pid: "P12", round: 1, classKey: preFull.key });
+  const r2 = await post("/api/reserve", { pid: "P12", round: 2, classKey: preFull.key });
   assert(!r2.ok && r2.reason === "full" && r2.aFull === true, "kelas A pre-full ditolak, aFull=true");
 
   // 3) bentrok jadwal: P12 (belum punya kelas) ambil kelas x, lalu kelas y yang bentrok dengan x
@@ -32,20 +32,31 @@ const assert = (c: boolean, m: string) => { console.log(c ? "PASS" : "FAIL", m);
   const pair = open.flatMap((x) => open.filter((y) => clash(x, y)).map((y) => [x, y] as const))[0];
   if (pair) {
     const loser = pids.find((_, i) => !rs[i].ok)!;
-    const rx = await post("/api/reserve", { pid: loser, round: 1, classKey: pair[0].key });
-    const r3 = await post("/api/reserve", { pid: loser, round: 1, classKey: pair[1].key });
+    const rx = await post("/api/reserve", { pid: loser, round: 2, classKey: pair[0].key });
+    const r3 = await post("/api/reserve", { pid: loser, round: 2, classKey: pair[1].key });
     assert(rx.ok && !r3.ok && r3.reason === "conflict", `bentrok ditolak (${r3.detail})`);
   } else console.log("SKIP bentrok (katalog tidak punya pasangan kelas bentrok)");
 
   // 4) matkul sama dua kali
   const sameCourse = cat.find((c) => c.course === openA.course && c.key !== openA.key)!;
-  const r4 = await post("/api/reserve", { pid: winner, round: 1, classKey: sameCourse.key });
+  const r4 = await post("/api/reserve", { pid: winner, round: 2, classKey: sameCourse.key });
   assert(!r4.ok && r4.reason === "already", "matkul yang sama ditolak (already)");
 
   // 5) batal -> kursi kembali
-  await post("/api/release", { pid: winner, round: 1, classKey: openA.key });
-  const s2 = await (await fetch(B + "/api/slots?catalog=1")).json();
+  await post("/api/release", { pid: winner, round: 2, classKey: openA.key });
+  const s2 = await (await fetch(B + "/api/slots?catalog=2")).json();
   assert(s2.taken[openA.key] === openA.quota - 1, `release mengembalikan kursi (${openA.quota - 1}/${openA.quota})`);
+
+  // 5b) SANTAI (ronde 1): kuota privat, 12 peserta ambil kelas yang sama -> semua berhasil, kuota bersama tetap
+  const cat1 = getCatalog(1);
+  const s1 = cat1.find((c) => isA(c.code) && c.initialTaken < c.quota)!;
+  const rs1 = await Promise.all(pids.map((pid) => post("/api/reserve", { pid, round: 1, classKey: s1.key })));
+  assert(rs1.every((r) => r.ok), `santai: ${rs1.filter((r) => r.ok).length}/12 berhasil ambil kelas yang sama`);
+  const sl1 = await (await fetch(B + "/api/slots?catalog=1")).json();
+  assert(sl1.taken[s1.key] === s1.initialTaken, "santai: kuota bersama tidak berkurang");
+  const pf1 = cat1.find((c) => c.initialTaken >= c.quota)!;
+  const r5 = await post("/api/reserve", { pid: "P01", round: 1, classKey: pf1.key });
+  assert(!r5.ok && r5.reason === "full", "santai: kelas yang penuh sejak awal tetap ditolak");
 
   // 6) SUS: 5 di butir ganjil, 1 di genap -> 100
   const sus = await post("/api/sus", { pid: winner, round: 1, widget: "siakad", answers: [5, 1, 5, 1, 5, 1, 5, 1, 5, 1] });
@@ -60,7 +71,7 @@ const assert = (c: boolean, m: string) => { console.log(c ? "PASS" : "FAIL", m);
   assert(!bad.ok, "widgetType tidak dikenal ditolak");
   const csv = await (await fetch(`${B}/api/admin/export?token=${TOKEN}`)).text();
   const lines = csv.split("\n");
-  assert(lines.length === 3 && lines[0].includes("widget_type") && lines[0].includes("wrong_pick") && csv.includes(",100"), "CSV berisi 2 baris data + widget_type, wrong_pick, sus_score");
+  assert(lines.length === 3 && lines[0].includes("condition") && lines[0].includes("widget_type") && lines[0].includes("wrong_pick") && csv.includes(",100"), "CSV berisi 2 baris data + condition, widget_type, wrong_pick, sus_score");
   const unauth = await fetch(`${B}/api/admin/export?token=salah`);
   assert(unauth.status === 401, "admin menolak token salah");
 
