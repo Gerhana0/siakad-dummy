@@ -8,7 +8,7 @@ export type Metrics = {
   optionsDisplayMs: number; // lama daftar opsi terbuka
   firstKeyLatencyMs: number; // fokus input -> ketikan pertama (-1 bila tidak mengetik)
   keystrokes: number;
-  misclicks: number; // klik di area widget di luar elemen [data-interactive]
+  misclicks: number; // klik di area widget yang tidak memicu aksi
   totalMs: number; // interaksi pertama -> kelas berhasil diambil
 };
 
@@ -37,8 +37,11 @@ export function useTracker() {
       if (l) s.current.trace += Math.hypot(e.clientX - l.x, e.clientY - l.y);
       s.current.last = { x: e.clientX, y: e.clientY };
     },
+    // Misclick: klik yang tidak mengenai elemen [data-interactive]. Elemen [data-surface] (mis. badan
+    // modal) menandai area "kosong" di dalam elemen interaktif seperti latar modal.
     onClick: (e: React.MouseEvent) => {
-      if (!(e.target as HTMLElement).closest("[data-interactive]")) s.current.miss++;
+      const hit = (e.target as HTMLElement).closest("[data-interactive], [data-surface]");
+      if (!hit || hit.hasAttribute("data-surface")) s.current.miss++;
     },
   };
 

@@ -1,5 +1,5 @@
 import { pool, ready } from "@/lib/db";
-import { clash, courseName, getCatalog } from "@/lib/catalog";
+import { clash, courseName, getCatalog, isA } from "@/lib/catalog";
 
 export async function POST(req: Request) {
   await ready();
@@ -38,11 +38,10 @@ export async function POST(req: Request) {
       });
     }
 
-    // Status kelas A matkul ini saat dicoba (untuk analisis "A penuh vs tersedia").
-    const a = await client.query("SELECT taken, quota FROM class_slots WHERE class_key=$1", [
-      `${round}-${cls.course}-A`,
-    ]);
-    const aFull = a.rows[0].taken >= a.rows[0].quota;
+    // Status kelas A (A1 dan A2) matkul ini saat dicoba (untuk analisis "A penuh vs tersedia").
+    const aKeys = cat.filter((c) => c.course === cls.course && isA(c.code)).map((c) => c.key);
+    const a = await client.query("SELECT taken, quota FROM class_slots WHERE class_key = ANY($1)", [aKeys]);
+    const aFull = a.rows.length > 0 && a.rows.every((r) => r.taken >= r.quota);
 
     // Pengurangan kuota atomik: hanya berhasil bila masih ada kursi.
     const up = await client.query(

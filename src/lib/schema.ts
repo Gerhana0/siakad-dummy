@@ -68,4 +68,9 @@ CREATE TABLE IF NOT EXISTS feedback (
   open_text  text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Kolom tambahan (UI SIAKAD: dua widget per mata kuliah). Aman dijalankan berulang.
+ALTER TABLE interactions ADD COLUMN IF NOT EXISTS widget_type text;
+ALTER TABLE interactions ADD COLUMN IF NOT EXISTS wrong_pick int;
+ALTER TABLE interactions ALTER COLUMN class_code DROP NOT NULL;
 `;

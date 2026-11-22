@@ -1,4 +1,4 @@
-# Simulasi KRS — instrumen penelitian
+# Simulasi KRS: instrumen penelitian
 
 Next.js (App Router) + PostgreSQL. Mensimulasikan war KRS (7 matkul, 20 SKS, target kelas A, kuota 5 per kelas,
 bentrok jadwal) sambil merekam _micro-measures_ widget dan SEQ per interaksi, SUS per ronde.
@@ -19,13 +19,17 @@ Tabel dan kuota awal dibuat otomatis saat request pertama. Tidak ada langkah mig
 
 ## Alur peserta
 
-Persetujuan + kode (P01, P02, …) → Ronde 1 → SUS → Ronde 2 → SUS → 2 pertanyaan akhir.
+Persetujuan + kode (P01, P02, …) → Ronde 1 → SUS → Ronde 2 → SUS → 1 pertanyaan terbuka.
 
-- Widget ditentukan sistem dari kode: kode ganjil mulai dropdown, genap mulai typing (counterbalancing).
-- Ronde 1 memakai katalog 1, ronde 2 katalog 2 (jadwal dan bentrok berbeda, kesulitan setara: 3 kelas A penuh
-  sejak awal, 2 pasang kelas A bentrok, maksimal 3 kelas A yang bisa diperoleh).
+- Tampilan meniru halaman Input KRS SIAKAD (referensi di `docs/referensi UI/`), dengan identitas netral.
+- Setiap mata kuliah diambil lewat dua widget, dan **SEQ ditanyakan setelah tiap widget**:
+  1. **Pilih mata kuliah** (`course_picker`): modal berisi kolom cari dan grid kartu 39 mata kuliah.
+     Memilih matkul di luar paket menampilkan pesan dan dicatat sebagai `wrong_pick`.
+  2. **Pilih jadwal kelas** (`class_picker`): kartu radio kelas A1/A2/B1/B2 dengan kuota langsung
+     ("Terisi x dari 40 kursi"). Kelas bentrok dan penuh dinonaktifkan.
+- Tiap ronde memakai paket 6 matkul yang berbeda. Kursi dibuat langka: kelas A tersisa 2–4 kursi, kelas B
+  11–13 kursi, dan 2 matkul kelas A-nya penuh sejak awal. Aman untuk sampai sekitar 20 peserta.
 - Urutan matkul bebas. Kuota diperebutkan nyata antar peserta (pengurangan atomik di Postgres).
-- Widget memuat semua 42 kelas (7 matkul × 6 kelas).
 - Peserta menekan "Mulai ronde" setelah aba-aba peneliti agar semua mulai bersamaan.
 
 ## Panel peneliti (`/admin`)
@@ -35,12 +39,13 @@ membersihkan uji coba.
 
 ## Data (CSV)
 
-Satu baris = satu interaksi (satu kelas berhasil diambil). Kolom utama:
+Satu baris = satu interaksi pada satu widget (`widget_type`: `course_picker` atau `class_picker`). Kolom utama:
 
 - Target (y): `seq` (1–7)
-- Fitur: `dwell_hover_ms`, `mouse_trace_len`, `selections`, `options_display_ms`, `first_key_latency_ms`,
-  `keystrokes`, `misclicks`, `total_ms`, `attempts`, `fail_full`, `fail_conflict`
-- Kovariat: `widget`, `round`, `order_pos`, `reserved_before`, `a_full_at_pick`, `got_a`, `widget_first`
+- Fitur: `dwell_hover_ms`, `mouse_trace_len`, `selections`, `options_display_ms` (lama modal terbuka; -1 untuk
+  `class_picker`), `first_key_latency_ms`, `keystrokes`, `misclicks`, `total_ms`, `attempts`, `fail_full`,
+  `fail_conflict` (termasuk klik pada kelas yang dinonaktifkan), `wrong_pick`
+- Kovariat: `widget_type`, `round`, `order_pos`, `reserved_before`, `a_full_at_pick`, `got_a`
 - Validasi: `sus_score` (skor SUS ronde itu, diulang di tiap baris ronde yang sama)
 
 Untuk model, pisahkan data per partisipan (`GroupKFold` pada `pid`).
@@ -48,6 +53,6 @@ Untuk model, pisahkan data per partisipan (`GroupKFold` pada `pid`).
 ## Hal yang perlu Anda putuskan atau periksa
 
 1. **Butir SUS** di `src/lib/sus.ts` masih terjemahan sementara. Ganti dengan versi Indonesia yang tervalidasi.
-2. **Jumlah peserta**: tiap matkul berkapasitas 30 kursi (5 × 6), sehingga aman untuk sampai sekitar 24 peserta.
-3. `npm run seeds` mencari ulang seed katalog bila Anda mengubah jumlah matkul, kelas, atau jadwal.
-4. `npm run e2e` menguji API (kuota serentak, bentrok, SUS, CSV) terhadap server yang sedang berjalan.
+2. **Jumlah peserta**: sisa kursi diatur di `SEATS_LEFT` pada `src/lib/catalog.ts` (saat ini aman sampai sekitar 20 peserta).
+3. `npm run seeds` mencari ulang seed katalog bila Anda mengubah paket matkul, kelas, atau sesi.
+4. `npm run e2e` menguji API (kuota serentak, bentrok, SUS, CSV) terhadap server yang sedang berjalan. **Menghapus semua data.**

@@ -2,22 +2,28 @@
 import { useState } from "react";
 import { SUS_ITEMS } from "@/lib/sus";
 
-export default function SusForm({ onSubmit }: { onSubmit: (answers: number[]) => Promise<void> }) {
+export default function SusForm({
+  round,
+  onSubmit,
+}: {
+  round: 1 | 2;
+  onSubmit: (answers: number[]) => Promise<void>;
+}) {
   const [a, setA] = useState<(number | null)[]>(Array(SUS_ITEMS.length).fill(null));
   const [busy, setBusy] = useState(false);
   const complete = a.every((x) => x !== null);
 
   return (
-    <section className="panel">
-      <h2>Penilaian tampilan pemilihan kelas tadi</h2>
-      <p className="muted">1 = sangat tidak setuju, 5 = sangat setuju.</p>
+    <div>
+      <h2>Penilaian pengisian KRS (ronde {round})</h2>
+      <p className="muted">Nilai tampilan pengisian KRS yang baru Anda pakai. 1 = sangat tidak setuju, 5 = sangat setuju.</p>
       <ol className="sus">
         {SUS_ITEMS.map((t, i) => (
           <li key={i}>
             <p>{t}</p>
-            <div className="likert">
+            <div className="likert" role="radiogroup" aria-label={`Butir ${i + 1}`}>
               {[1, 2, 3, 4, 5].map((n) => (
-                <label key={n}>
+                <label key={n} className={a[i] === n ? "is-on" : ""}>
                   <input
                     type="radio"
                     name={`q${i}`}
@@ -32,7 +38,7 @@ export default function SusForm({ onSubmit }: { onSubmit: (answers: number[]) =>
         ))}
       </ol>
       <button
-        className="btn"
+        className="btn block"
         disabled={!complete || busy}
         onClick={async () => {
           setBusy(true);
@@ -42,6 +48,6 @@ export default function SusForm({ onSubmit }: { onSubmit: (answers: number[]) =>
       >
         Lanjut
       </button>
-    </section>
+    </div>
   );
 }
