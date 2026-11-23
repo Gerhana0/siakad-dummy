@@ -64,8 +64,22 @@ export const CONDITION: Record<1 | 2, Condition> = { 1: "santai", 2: "war" };
 
 /** Paket KRS (mata kuliah yang wajib diambil) per ronde. */
 export const TARGETS: Record<1 | 2, string[]> = {
-  1: ["23013120313", "23013120314", "23013120321", "23013120322", "23013120231", "23013120203"],
-  2: ["23013130331", "23013120324", "23013120323", "23013130324", "23013120236", "23013120311"],
+  1: [
+    "23013120313",
+    "23013120314",
+    "23013120321",
+    "23013120322",
+    "23013120231",
+    "23013120203",
+  ],
+  2: [
+    "23013130331",
+    "23013120324",
+    "23013120323",
+    "23013130324",
+    "23013120236",
+    "23013120311",
+  ],
 };
 
 export const DAYS = ["SENIN", "SELASA", "RABU", "KAMIS", "JUMAT"];
@@ -75,7 +89,8 @@ export const SESSIONS = [
   [4, 5],
   [7, 8],
 ];
-export const sessionLabel = (slot: number) => `Sesi ${SESSIONS[slot].join(",")}`;
+export const sessionLabel = (slot: number) =>
+  `Sesi ${SESSIONS[slot].join(",")}`;
 
 export const CLASS_CODES = ["A1", "A2", "B1", "B2"];
 export const isA = (classCode: string) => classCode.startsWith("A");
@@ -85,7 +100,7 @@ export const isA = (classCode: string) => classCode.startsWith("A");
  * (A1 + A2 = 6 kursi) supaya diperebutkan. Kelas B (B1 + B2 = 24 kursi) menjamin setiap peserta
  * kebagian kelas, jadi aman untuk sampai sekitar 24 peserta.
  */
-export const QUOTA = { A: 3, B: 12 } as const;
+export const QUOTA = { A: 3, B: 18 } as const;
 export const PREFULL = 2; // jumlah matkul yang semua kelas A-nya sudah penuh sejak awal
 
 // Seed hasil scripts/find-seeds.ts (tingkat kesulitan kedua set dibuat setara).
@@ -127,7 +142,7 @@ export function generate(seed: number, no: 1 | 2): Cls[] {
         quota,
         initialTaken: a && full.has(course) ? quota : 0,
       };
-    })
+    }),
   );
 }
 
