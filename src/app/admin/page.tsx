@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Brand } from "@/components/Shell";
 
 export default function Admin() {
   const [token, setToken] = useState("");
@@ -13,10 +14,11 @@ export default function Admin() {
   };
 
   return (
-    <main className="shell narrow">
-      <section className="panel">
+    <main className="centered">
+      <Brand />
+      <section className="card narrow-card">
         <h1>Panel peneliti</h1>
-        <label className="picker-label" htmlFor="tk">Token admin</label>
+        <label className="label" htmlFor="tk">Token admin</label>
         <input id="tk" className="field" type="password" value={token} onChange={(e) => setToken(e.target.value)} />
         <div className="row">
           <a className="btn" href={`/api/admin/export?token=${encodeURIComponent(token)}`}>Unduh CSV</a>

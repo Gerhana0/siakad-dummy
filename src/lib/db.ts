@@ -30,7 +30,12 @@ export async function seedSlots(reset: boolean) {
       for (const k of getCatalog(no)) {
         await c.query(
           `INSERT INTO class_slots (class_key, catalog, course_code, class_code, quota, taken)
-           VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (class_key) DO NOTHING`,
+           VALUES ($1,$2,$3,$4,$5,$6)
+           ON CONFLICT (class_key) DO UPDATE SET
+             quota = EXCLUDED.quota,
+             -- Bila kuota di katalog berubah, kursi terisi dikembalikan ke kondisi awal.
+             -- Bila tidak berubah (mis. server di-restart di tengah sesi), kursi terisi dipertahankan.
+             taken = CASE WHEN class_slots.quota <> EXCLUDED.quota THEN EXCLUDED.taken ELSE class_slots.taken END`,
           [k.key, no, k.course, k.code, k.quota, k.initialTaken]
         );
       }

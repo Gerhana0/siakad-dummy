@@ -4,332 +4,325 @@
 |---|---|
 | **Proyek** | Proyek IMK, Kelompok 7 |
 | **Judul penelitian** | Prediksi Otomatis Interaction Effort pada Widget Pemilihan Kelas SIAKAD Menggunakan Micro-measures dan Single Ease Question (SEQ) |
-| **Dokumen acuan** | `docs/Proyek IMK.pdf` (proposal) |
-| **Status** | Draf v1, 22 November 2026 |
+| **Dokumen acuan** | `docs/Proyek IMK.pdf` (proposal), `docs/referensi UI/` (screenshot SIAKAD) |
+| **Status** | Draf v2, 22 November 2026 |
 | **Repo** | `siakad-dummy` (Next.js 16 + PostgreSQL) |
+
+**Perubahan dari v1:** perbandingan versi widget (dropdown vs search, radio panjang vs ringkas) dihapus. Aplikasi kini **meniru satu desain, yaitu halaman Input KRS SIAKAD apa adanya**, dan fokus penelitian adalah **prediksi** effort, bukan perbandingan desain.
 
 ---
 
 ## 1. Ringkasan
 
-Aplikasi web yang meniru alur pengisian KRS SIAKAD dan dipakai sebagai **instrumen eksperimen**. Peserta berada di **satu ruangan dan mulai pada waktu yang sama**, lalu memperebutkan kuota kelas yang terbatas (**siapa cepat dia dapat**), persis seperti war KRS sungguhan. Selama peserta mengisi, aplikasi merekam *micro-measures* dari event DOM pada tiap widget. Setiap widget yang selesai diisi diikuti pertanyaan **SEQ** (1–7) sebagai *ground truth* interaction effort. **SUS** diberikan per pasangan versi widget sebagai bukti validitas kriteria.
+**Tujuan penelitian:** mengetahui apakah beban interaksi (*interaction effort*) mahasiswa saat war KRS bisa **diprediksi otomatis dari perilaku mouse dan keyboard**, tanpa harus menanyai mereka satu per satu.
 
-Data yang dihasilkan dipakai untuk:
+Aplikasi ini adalah **instrumen** untuk mengumpulkan data latihnya:
+- Meniru halaman Input KRS SIAKAD (tata letak dan alur sama, identitas visual netral).
+- Peserta berada di **satu ruangan dan mulai pada waktu yang sama**, lalu memperebutkan kuota kelas yang terbatas (**siapa cepat dia dapat**).
+- Selama mengisi, aplikasi merekam **micro-measures** dari event DOM di setiap widget.
+- Setiap widget yang selesai diisi diikuti **SEQ** (1–7) sebagai *ground truth* effort.
+
+> **Penting:** SEQ tetap ditanyakan selama pengambilan data, karena SEQ adalah label untuk **melatih** model. "Tanpa menanyai" adalah hasil akhir yang diharapkan: setelah model terlatih, effort cukup diprediksi dari micro-measures.
+
+Data dipakai untuk:
 1. melatih model (Decision Tree dan pembanding) yang memprediksi SEQ dari micro-measures, dan
-2. membandingkan effort antar desain widget serta antara kondisi santai dan war.
+2. melihat pengaruh kondisi war terhadap effort.
 
-## 2. Latar belakang dan revisi terhadap proposal
-
-Proposal awal merancang eksperimen **remote** dengan tekanan waktu buatan (countdown dan kuota yang habis terjadwal). Desain itu direvisi:
+## 2. Revisi terhadap proposal
 
 | Aspek | Proposal awal | Revisi (PRD ini) | Alasan |
 |---|---|---|---|
-| Pelaksanaan | Remote lewat tautan | **Sesi lab serentak**: satu ruangan, satu waktu, satu WiFi | Memungkinkan perebutan kuota nyata |
+| Pelaksanaan | Remote lewat tautan | **Sesi lab serentak**: satu ruangan, satu waktu, satu jaringan | Memungkinkan perebutan kuota nyata |
 | Sumber tekanan | Countdown dan kuota habis terjadwal | **Perebutan kuota nyata antar peserta** | Lebih mirip war KRS asli; tekanan muncul alami |
+| Desain widget | Dua versi tiap widget (dropdown vs search; radio panjang vs ringkas) | **Satu desain: tiru SIAKAD asli** (modal cari + grid kartu, lalu kartu radio jadwal) | Fokus ke prediksi; validitas ekologis lebih tinggi; widget yang diteliti adalah widget yang benar-benar dipakai mahasiswa |
 | Faktor kondisi | Santai vs time-pressure | **Santai vs war** | H4 tetap bisa diuji |
-| Urutan kondisi | Latin square penuh | Urutan kondisi tetap (santai → war); urutan widget di-counterbalance (4 urutan) | Blok war harus serentak untuk semua orang |
-| Widget pilih jadwal | Radio panjang vs ringkas | **Tetap ada**, menjadi langkah ke-2 di setiap matkul | Sesuai alur SIAKAD: cari matkul → pilih kelas paralel |
+| Urutan | Latin square | Urutan tetap: latihan → santai → war | Blok war harus serentak untuk semua orang |
+| H3 | Dropdown vs searchable input | **Diganti:** perbandingan effort antara widget pilih matkul dan widget pilih jadwal | Tidak ada lagi dua versi widget; perbandingan antar widget asli tetap memberi pelajaran desain |
 
-Perubahan ini harus ikut tercatat di revisi proposal (bagian metode dan validitas).
+Konsekuensi untuk proposal:
+- Klaim research gap *"membandingkan dua desain widget"* diganti menjadi *"mengidentifikasi widget SIAKAD mana yang paling membebani, berdasarkan model prediksi"*.
+- Bagian metode, prosedur, dan validitas disesuaikan dengan tabel di atas.
 
-## 3. Tujuan, RQ, dan hipotesis → kebutuhan data
+## 3. Hipotesis dan kebutuhan data
 
-| ID | Pertanyaan penelitian | Hipotesis | Data yang dibutuhkan dari aplikasi |
+| ID | Pertanyaan penelitian | Hipotesis | Data dari aplikasi |
 |---|---|---|---|
-| H1 | Seberapa akurat Decision Tree memprediksi SEQ dari micro-measures? | MAE ≤ 0,5 dan R² ≥ 0,5 | Baris interaksi: fitur micro-measures + `seq` + `pid` |
-| H2 | Metrik apa yang punya Gini importance tertinggi di tiap jenis widget? | Dwell+Hover dan Selections dominan; Misclicks paling rendah | Sama seperti H1, ditambah `widget_type` dan `widget_version` |
-| H3 | Apakah effort berbeda antara dropdown dan searchable input (serta radio panjang vs ringkas)? | Dropdown panjang punya effort lebih tinggi | `widget_version`, `seq`, metrik, desain within-subject |
-| H4 | Apakah kondisi war mengubah micro-measures dan SEQ? | War menaikkan Dwell+Hover dan Selections serta menurunkan SEQ | `condition` (santai/war); analisis tambahan: `a_full_at_pick`, `fail_full` |
-| H5 | Apakah SEQ berkorelasi dengan SUS? | Spearman ρ ≥ 0,5 | Rata-rata SEQ per blok dan skor SUS pasangan widget |
+| H1 | Seberapa akurat Decision Tree memprediksi SEQ dari micro-measures? | MAE ≤ 0,5 dan R² ≥ 0,5 | Fitur micro-measures + `seq` + `pid` |
+| H2 | Metrik apa yang punya Gini importance tertinggi di tiap jenis widget? | Dwell+Hover dan Selections dominan; Misclicks paling rendah | Sama seperti H1, ditambah `widget_type` |
+| H3 (revisi) | Apakah effort berbeda antara widget pilih matkul dan widget pilih jadwal? | Pilih jadwal lebih berat (informasi padat, bentrok, kuota) | `widget_type`, `seq`, metrik |
+| H4 | Apakah kondisi war mengubah micro-measures dan SEQ? | War menaikkan Dwell+Hover dan Selections serta menurunkan SEQ | `condition`; analisis tambahan: `a_full_at_pick`, `fail_full` |
+| H5 | Apakah SEQ berkorelasi dengan SUS? | Spearman ρ ≥ 0,5 | Rata-rata SEQ per blok dan skor SUS blok itu |
 | H6 | Apakah Decision Tree kompetitif dibanding model lain? | DT ≥ LR dan sebanding dengan RF | Sama seperti H1 |
 
 ## 4. Pengguna
 
 | Peran | Kebutuhan utama |
 |---|---|
-| **Peserta** (15–20 mahasiswa aktif yang pernah mengisi KRS) | Alur jelas, tidak perlu instalasi, tugas yang terasa seperti KRS asli, durasi sekitar 20–25 menit |
-| **Peneliti** (operator sesi) | Menyiapkan sesi, mengatur kuota sesuai jumlah peserta, memberi aba-aba mulai secara serentak, memantau progres, mengunduh data lengkap |
-| **Analis data** (tim) | CSV yang bersih, terdokumentasi, dan lengkap (termasuk log mentah dan alasan eksklusi) |
+| **Peserta** (15–20 mahasiswa aktif yang pernah mengisi KRS) | Tampilan yang familiar seperti SIAKAD, tanpa instalasi, durasi sekitar 20 menit |
+| **Peneliti** (operator sesi) | Menyiapkan sesi, mengatur kuota sesuai jumlah peserta, memulai blok war serentak, memantau progres, mengunduh data |
+| **Analis data** (tim) | CSV yang lengkap dan terdokumentasi, termasuk alasan data dikeluarkan |
 
 ## 5. Desain eksperimen
 
-### 5.1 Faktor
-- **Widget pilih mata kuliah (W1):** `dropdown` (30–50 opsi) vs `search` (searchable input dengan autocomplete)
-- **Widget pilih kelas paralel (W2):** `radio_long` vs `radio_short`
-- **Kondisi:** `santai` vs `war`
-
-Semua faktor diuji **within-subject**. Unit analisis adalah **satu interaksi pada satu widget**.
+### 5.1 Variabel
+- **Unit analisis:** satu interaksi pada satu widget.
+- **Target (y):** SEQ 1–7.
+- **Fitur (x):** micro-measures (bagian 8.2).
+- **Jenis widget** (`widget_type`): `course_picker` (pilih mata kuliah) dan `class_picker` (pilih jadwal kelas).
+- **Kondisi** (`condition`): `santai` vs `war`, within-subject.
 
 ### 5.2 Struktur sesi
 
 | Langkah | Isi | Perkiraan waktu |
 |---|---|---|
-| 0 | Persetujuan (informed consent) + kode peserta | 1 menit |
-| 1 | Demografi singkat | 1 menit |
-| 2 | **Blok 1 (Santai)**, pasangan widget P1, 4 matkul | 3–4 menit |
-| 3 | **Blok 2 (War, serentak)**, pasangan widget P1, 4 matkul | 3–4 menit |
-| 4 | SUS untuk pasangan P1 | 2 menit |
-| 5 | **Blok 3 (Santai)**, pasangan widget P2, 4 matkul | 3–4 menit |
-| 6 | **Blok 4 (War, serentak)**, pasangan widget P2, 4 matkul | 3–4 menit |
-| 7 | SUS untuk pasangan P2 | 2 menit |
-| 8 | Pertanyaan akhir (preferensi + terbuka) | 2 menit |
-| | **Total** | **sekitar 20–25 menit** |
+| 0 | Persetujuan + kode peserta | 1 menit |
+| 1 | Demografi singkat (angkatan, frekuensi memakai SIAKAD, perangkat input) | 1 menit |
+| 2 | **Latihan**: 1 matkul, data tidak dipakai untuk analisis | 1–2 menit |
+| 3 | **Blok santai**: paket 6 matkul, dikerjakan sendiri, kuota tidak diperebutkan | 5 menit |
+| 4 | SUS blok santai | 2 menit |
+| 5 | **Blok war** (serentak): paket 6 matkul lain, kuota diperebutkan | 5 menit |
+| 6 | SUS blok war | 2 menit |
+| 7 | Pertanyaan terbuka | 1–2 menit |
+| | **Total** | **sekitar 20 menit** |
 
-Blok 1 sekaligus berfungsi sebagai latihan alur dan SEQ.
-
-### 5.3 Counterbalancing (4 urutan)
-
-Grup ditentukan dari angka di kode peserta: `grup = ((n − 1) mod 4) + 1`. Contoh: P01 → 1, P02 → 2, P05 → 1.
-
-| Grup | Pasangan P1 (blok 1–2) | Pasangan P2 (blok 3–4) |
-|---|---|---|
-| 1 | dropdown + radio_long | search + radio_short |
-| 2 | search + radio_short | dropdown + radio_long |
-| 3 | dropdown + radio_short | search + radio_long |
-| 4 | search + radio_long | dropdown + radio_short |
-
-Dengan pola ini, setiap peserta mencoba keempat versi widget, dan W1 tidak selalu berpasangan dengan versi W2 yang sama.
-
-### 5.4 Kondisi
+### 5.3 Kondisi
 
 | | Santai | War |
 |---|---|---|
 | Waktu mulai | Masing-masing peserta | **Serentak**, dipicu peneliti dari panel admin |
 | Kuota | **Privat per peserta** (tidak terpengaruh peserta lain) | **Dibagi semua peserta**, dikurangi secara atomik di server |
 | Kelas penuh dan bentrok | Ada (pola sama dengan war) | Ada, ditambah kursi yang habis karena peserta lain |
-| Batas waktu | Tidak ada (hanya batas aman, misalnya 10 menit) | Ada, dapat diatur (bawaan 5 menit), **tidak ditampilkan** ke peserta |
-| Tujuan | Baseline effort tanpa persaingan | Replikasi war KRS |
+| Batas waktu | Tidak ada (hanya batas aman, misalnya 10 menit) | Ada, dapat diatur (bawaan 5 menit), tidak ditampilkan |
 
-Beda santai dan war hanya pada **persaingan**. Struktur katalog dan tingkat kesulitannya dibuat setara.
+Kedua blok memakai paket matkul berbeda dengan tingkat kesulitan yang disetarakan lewat seed katalog. Beda kondisi hanya pada **persaingan**.
 
-### 5.5 Estimasi data
-15 peserta × 4 blok × 4 matkul × 2 widget = **sekitar 480 interaksi** (proposal: 240+).
+### 5.4 Estimasi data
+15 peserta × 2 blok × 6 matkul × 2 widget = **sekitar 360 interaksi** (proposal: 240+).
 
-## 6. Alur peserta per matkul
+## 6. Alur per mata kuliah (meniru SIAKAD)
 
 ```
-Daftar matkul target blok ini (4 matkul)
+Paket KRS blok ini (6 matkul), ditampilkan di kotak info
         │
         ▼
-[W1] Pilih mata kuliah  ── dropdown (30–50 opsi) / search
-        │  konfirmasi "Lanjut" (matkul bukan target → pesan, dihitung wrong_pick)
+[W1 course_picker] Tombol "Pilih mata kuliah" → modal: kolom cari + grid kartu (39 matkul)
+        │  matkul di luar paket → pesan, dihitung wrong_pick
         ▼
-   SEQ #1  "Seberapa mudah menyelesaikan langkah ini?" (1–7)
+   SEQ #1  "Seberapa mudah menyelesaikan langkah ini?"
         │
         ▼
-[W2] Pilih kelas paralel ── radio_long / radio_short (kelas A–F)
-        │  "Ambil kelas" → server: berhasil / penuh / bentrok
-        │  gagal → tetap di W2, pilih kelas lain (dihitung attempts, fail_*)
+[W2 class_picker] Kartu radio jadwal kelas A1/A2/B1/B2
+        │  tiap kartu: hari + sesi, "Terisi x dari y kursi", bar kuota
+        │  kelas bentrok/penuh dinonaktifkan + pesan merah
+        │  "Tambahkan ke KRS" → modal "Konfirmasi mata kuliah" (Tutup / Simpan)
+        │  "Simpan" → server: berhasil / penuh (kursi direbut orang lain)
         ▼
    SEQ #2
         │
         ▼
-KRS diperbarui → matkul berikutnya (urutan bebas)
+Panel "KRS Anda" diperbarui → matkul berikutnya (urutan bebas)
 ```
 
-- Target: **usahakan kelas A** untuk semua matkul.
-- Peserta boleh **membatalkan** kelas yang sudah diambil untuk menyelesaikan bentrok. Pembatalan dicatat.
-- Jika suatu matkul tidak mungkin diselesaikan, tersedia tombol **"Lewati matkul ini"**. Kejadian ini dicatat.
-- Blok selesai jika semua matkul target sudah diambil atau dilewati, atau batas waktu habis.
+- Target: ambil semua matkul paket dan **usahakan kelas A (A1/A2)**.
+- Peserta boleh menghapus kelas dari KRS untuk menyelesaikan bentrok.
+- Blok selesai bila semua matkul paket sudah diambil atau dilewati, atau batas waktu habis.
 
 ## 7. Kebutuhan fungsional
 
 Status: **Ada** = sudah diimplementasikan · **Ubah** = ada tapi perlu diubah · **Baru** = belum ada.
 Prioritas: **P0** wajib sebelum pengambilan data · **P1** sangat disarankan · **P2** opsional.
 
-### 7.1 Onboarding
+### 7.1 Tampilan dan onboarding
 
 | ID | Kebutuhan | Status | Prioritas |
 |---|---|---|---|
-| F-01 | Halaman persetujuan: tujuan, data yang direkam, sukarela, anonim | Ada | P0 |
-| F-02 | Input kode peserta (P01, P02, …), menentukan grup counterbalancing (5.3) | Ubah (saat ini 2 grup) | P0 |
-| F-03 | Form demografi: angkatan, prodi, frekuensi memakai SIAKAD, **perangkat input (mouse/touchpad)** | Baru | P0 |
-| F-04 | Cegah satu kode dipakai di dua perangkat bersamaan (token sesi) | Baru | P1 |
-| F-05 | Lanjutkan sesi setelah refresh tanpa kehilangan tahap (stage disimpan di server) | Ada | P0 |
+| F-01 | Halaman persetujuan + kode peserta | Ada | P0 |
+| F-02 | Kerangka halaman meniru SIAKAD: sidebar, header "Input KRS", kartu mahasiswa fiktif, tab, panel KRS Anda | Ada | P0 |
+| F-03 | Form demografi: angkatan, frekuensi memakai SIAKAD, **perangkat input (mouse/touchpad)** | Baru | P0 |
+| F-04 | Latihan 1 matkul sebelum blok santai, ditandai `practice` | Baru | P1 |
+| F-05 | Lanjutkan sesi setelah refresh tanpa kehilangan tahap | Ada | P0 |
+| F-06 | Cegah satu kode dipakai di dua perangkat bersamaan | Baru | P1 |
 
 ### 7.2 Katalog
 
 | ID | Kebutuhan | Status | Prioritas |
 |---|---|---|---|
-| F-10 | Katalog 30–50 mata kuliah fiktif (opsi W1), masing-masing dengan kelas paralel A–F | Ubah (saat ini 7 matkul) | P0 |
-| F-11 | Data kelas: kode kelas, dosen, hari/jam, ruang, kuota | Ubah (belum ada dosen dan ruang) | P0 |
-| F-12 | **4 set katalog/target** (satu per blok), dibangkitkan dari seed, dengan tingkat kesulitan setara (jumlah kelas A penuh sejak awal, pasangan bentrok, maksimal kelas A yang bisa diperoleh) | Ubah (saat ini 2 set) | P0 |
-| F-13 | Script pencari seed dengan kriteria kesulitan setara | Ubah (`scripts/find-seeds.ts`) | P1 |
+| F-10 | 39 mata kuliah fiktif di modal; paket 6 matkul per blok | Ada | P0 |
+| F-11 | Kelas paralel A1/A2/B1/B2 per matkul, hari + sesi (jam ke-), kuota = kursi sebenarnya (kelas A 3, kelas B 12), semua kosong di awal kecuali kelas A yang penuh sejak awal | Ada | P0 |
+| F-12 | Dua set katalog dengan kesulitan setara (dicari lewat `npm run seeds`) | Ada | P0 |
+| F-13 | Sisa kursi dapat diatur dari admin sesuai jumlah peserta yang hadir | Baru (saat ini konstanta di kode) | P0 |
 
-### 7.3 Widget W1: pilih mata kuliah
-
-| ID | Kebutuhan | Status | Prioritas |
-|---|---|---|---|
-| F-20 | `dropdown`: daftar panjang 30–50 opsi, dibuka dengan klik | Ubah | P0 |
-| F-21 | `search`: input teks dengan autocomplete (daftar muncul setelah mulai mengetik) | Ubah (saat ini daftar muncul saat fokus) | P0 |
-| F-22 | Dukungan keyboard: panah atas/bawah, Enter, Esc; daftar tertutup bila klik di luar | Baru | P1 |
-| F-23 | Memilih matkul yang bukan target menampilkan pesan dan dicatat (`wrong_pick`) | Baru | P1 |
-
-### 7.4 Widget W2: pilih kelas paralel
+### 7.3 Widget
 
 | ID | Kebutuhan | Status | Prioritas |
 |---|---|---|---|
-| F-30 | `radio_long`: tiap opsi memuat kelas, dosen, hari/jam, ruang, sisa kuota, dan teks peringatan bentrok yang panjang | Baru | P0 |
-| F-31 | `radio_short`: tiap opsi memuat kelas, jadwal ringkas, sisa kuota, penanda bentrok singkat | Baru | P0 |
-| F-32 | Sisa kuota diperbarui berkala (polling ≤ 3 detik) | Ada (di widget lama) | P0 |
-| F-33 | Tombol "Ambil kelas" → server memvalidasi: penuh / bentrok / sudah diambil | Ada | P0 |
+| F-20 | W1: modal "Pilih mata kuliah" dengan kolom cari dan grid kartu; Esc dan klik latar menutup modal | Ada | P0 |
+| F-21 | W1: matkul di luar paket memunculkan pesan dan dicatat `wrong_pick` | Ada | P0 |
+| F-22 | W2: kartu radio jadwal dengan kuota langsung (polling 3 detik) | Ada | P0 |
+| F-23 | W2: kelas bentrok dinonaktifkan dengan pesan tumbukan jadwal bergaya SIAKAD; kelas penuh dinonaktifkan | Ada | P0 |
+| F-24 | W2: "Tambahkan ke KRS" membuka modal "Konfirmasi mata kuliah" (mata kuliah, SKS, kelas, jadwal; Tutup / Simpan); "Simpan" divalidasi server (penuh / bentrok / sudah diambil) | Ada | P0 |
+| F-25 | Navigasi keyboard di grid kartu W1 | Baru | P2 |
 
-### 7.5 Mekanisme war dan santai
-
-| ID | Kebutuhan | Status | Prioritas |
-|---|---|---|---|
-| F-40 | Pengurangan kuota atomik di database (aman terhadap request serentak) | Ada | P0 |
-| F-41 | Mode santai: kuota privat per peserta, tidak terpengaruh peserta lain | Baru | P0 |
-| F-42 | **Ruang tunggu blok war**: peserta menunggu sampai peneliti menekan "Mulai" di admin, lalu semua klien mulai bersamaan | Baru (saat ini peserta menekan sendiri) | P0 |
-| F-43 | Batas waktu blok war (dapat diatur, tidak ditampilkan); saat habis, blok berakhir dan sisa matkul dicatat `timeout` | Baru | P0 |
-| F-44 | Tombol "Lewati matkul ini" + pencatatan | Baru | P0 |
-| F-45 | Pembatalan kelas dicatat sebagai event; interaksi terkait diberi tanda `cancelled` | Ubah (saat ini tidak tercatat) | P0 |
-| F-46 | Kuota kelas dapat diatur dari admin sesuai jumlah peserta yang hadir (misalnya kelas A untuk sekitar 30% peserta; total kursi per matkul ≥ jumlah peserta + cadangan) | Baru (saat ini tetap 5) | P0 |
-
-### 7.6 SEQ, SUS, dan pertanyaan akhir
+### 7.4 Kondisi santai dan war
 
 | ID | Kebutuhan | Status | Prioritas |
 |---|---|---|---|
-| F-50 | Pop-up SEQ 1–7 muncul otomatis setelah W1 dikonfirmasi dan setelah W2 berhasil. Teks: "Seberapa mudah menyelesaikan langkah ini?" | Ubah (saat ini hanya setelah kelas diambil, teks berbeda) | P0 |
-| F-51 | SUS 10 butir **versi Indonesia tervalidasi** (kandidat: adaptasi Sharfina & Santoso, 2016; cek dan sitasi), satu kali per pasangan widget | Ubah (masih terjemahan sementara) | P0 |
-| F-52 | Pertanyaan akhir: preferensi widget W1, preferensi W2, bagian yang paling merepotkan (terbuka) | Ubah (saat ini hanya W1) | P1 |
+| F-30 | Pengurangan kuota atomik di database | Ada | P0 |
+| F-31 | Ronde 1 = santai (kuota privat per peserta), ronde 2 = war (kuota bersama) | Ada | P0 |
+| F-32 | Ruang tunggu blok war: semua peserta mulai saat peneliti menekan "Mulai" di admin | Baru (saat ini peserta menekan sendiri setelah aba-aba) | P0 |
+| F-33 | Batas waktu blok war, dapat diatur, tidak ditampilkan; sisa matkul dicatat `timeout` | Baru | P0 |
+| F-34 | Tombol "Lewati matkul ini" + pencatatan | Baru | P0 |
+| F-35 | Penghapusan kelas dari KRS dicatat sebagai event; interaksi terkait ditandai `cancelled` | Ubah (kursi sudah kembali, tapi belum tercatat) | P1 |
 
-### 7.7 Pencatatan data (tracker)
-
-| ID | Kebutuhan | Status | Prioritas |
-|---|---|---|---|
-| F-60 | Ringkasan micro-measures per interaksi (lihat 8.2) | Ada (W1 lama) | P0 |
-| F-61 | **Log event mentah**: setiap event DOM penting dengan timestamp klien, timestamp server, ID widget, dan ID interaksi | Baru | P0 |
-| F-62 | Deteksi tab ditinggal (`visibilitychange`) dan total waktu tersembunyi per interaksi | Baru | P0 |
-| F-63 | Catat latensi jaringan (RTT request ambil kelas) | Baru | P1 |
-| F-64 | Semua pengiriman data dicek berhasil; bila gagal → coba ulang otomatis, lalu tampilkan pesan. Data tidak boleh hilang diam-diam | Ubah (saat ini error diabaikan) | P0 |
-| F-65 | Antrean lokal: data yang belum terkirim disimpan sementara di browser dan dikirim ulang | Baru | P1 |
-
-### 7.8 Panel peneliti (`/admin`)
+### 7.5 SEQ, SUS, pertanyaan akhir
 
 | ID | Kebutuhan | Status | Prioritas |
 |---|---|---|---|
-| F-70 | Login dengan token admin | Ada | P0 |
-| F-71 | Reset kuota / hapus semua data | Ada | P0 |
-| F-72 | Pengaturan sesi: jumlah peserta, rasio kuota kelas A, batas waktu war | Baru | P0 |
-| F-73 | Tombol "Mulai blok war 1" / "Mulai blok war 2" (memicu F-42) | Baru | P0 |
-| F-74 | Monitor peserta: kode, grup, tahap saat ini, jumlah matkul selesai, status online | Baru | P1 |
-| F-75 | Ekspor CSV: `interactions`, `events`, `sus` (per butir), `participants` (+ demografi), `feedback` | Ubah (saat ini hanya interactions) | P0 |
+| F-40 | SEQ 1–7 setelah W1 dan setelah W2, teks sesuai proposal | Ada | P0 |
+| F-41 | Jawaban SEQ yang gagal terkirim tidak hilang (coba ulang + pemberitahuan) | Ada | P0 |
+| F-42 | SUS 10 butir **versi Indonesia tervalidasi** (kandidat: adaptasi Sharfina & Santoso, 2016; cek dan sitasi), setelah tiap blok | Ubah (masih terjemahan sementara) | P0 |
+| F-43 | Pertanyaan terbuka "bagian paling merepotkan" | Ada | P0 |
+
+### 7.6 Pencatatan data
+
+| ID | Kebutuhan | Status | Prioritas |
+|---|---|---|---|
+| F-50 | Ringkasan micro-measures per interaksi per widget (8.2) | Ada | P0 |
+| F-51 | Kolom `condition` (santai/war) di data interaksi; kolom `practice` | `condition` Ada, `practice` Baru | P0 |
+| F-52 | **Log event mentah** dengan timestamp klien dan server, ID widget, ID interaksi | Baru | P1 |
+| F-53 | Deteksi tab ditinggal (`visibilitychange`), total waktu tersembunyi per interaksi | Baru | P0 |
+| F-54 | Catat latensi jaringan (RTT) saat menambahkan kelas | Baru | P1 |
+
+### 7.7 Panel peneliti (`/admin`)
+
+| ID | Kebutuhan | Status | Prioritas |
+|---|---|---|---|
+| F-60 | Login token, reset kuota, hapus semua data, unduh CSV interaksi | Ada | P0 |
+| F-61 | Pengaturan sesi: sisa kursi, batas waktu war | Baru | P0 |
+| F-62 | Tombol "Mulai blok war" (memicu F-32) | Baru | P0 |
+| F-63 | Monitor peserta: kode, tahap, jumlah matkul selesai | Baru | P1 |
+| F-64 | Ekspor tambahan: SUS per butir, demografi, jawaban terbuka, log event | Baru | P0 |
 
 ## 8. Kebutuhan data
 
 ### 8.1 Entitas
 
-| Tabel | Isi |
-|---|---|
-| `participants` | pid, grup, tahap, demografi, perangkat input, waktu dibuat |
-| `class_slots` | kuota dan jumlah terisi per kelas per katalog (war); santai disimpan per peserta |
-| `reservations` | kelas yang diambil, status aktif/dibatalkan |
-| `interactions` | satu baris per interaksi widget (lihat 8.2) |
-| `events` | log event mentah (F-61) |
-| `sus_responses` | jawaban per butir + skor, per pasangan widget |
-| `feedback` | preferensi + jawaban terbuka |
-| `session_config` | kuota, batas waktu, status mulai blok war |
+| Tabel | Isi | Status |
+|---|---|---|
+| `participants` | pid, tahap, demografi, waktu dibuat | Ada (demografi belum) |
+| `class_slots` | kuota dan jumlah terisi per kelas (war) | Ada |
+| `reservations` | kelas yang diambil, status aktif/dibatalkan | Ada |
+| `interactions` | satu baris per interaksi widget (8.2) | Ada |
+| `sus_responses` | jawaban per butir + skor, per blok | Ada |
+| `feedback` | jawaban terbuka | Ada |
+| `events` | log event mentah | Baru |
+| `session_config` | sisa kursi, batas waktu, status mulai war | Baru |
 
 ### 8.2 Kolom `interactions` (CSV utama)
 
 | Kelompok | Kolom | Definisi |
 |---|---|---|
-| Identitas | `pid`, `group`, `block` (1–4), `condition` (santai/war), `course_code`, `class_code` | |
-| Widget | `widget_type` (course_picker/class_picker), `widget_version` (dropdown/search/radio_long/radio_short) | |
+| Identitas | `pid`, `round`, `course_code`, `class_code` | `class_code` kosong untuk `course_picker` |
+| Widget | `widget_type` | `course_picker` atau `class_picker` |
+| Kondisi | `condition`, `practice` | `condition` diisi server dari ronde; `practice` belum ada |
 | **Target** | `seq` | 1–7 |
-| Fitur | `dwell_hover_ms` | Total waktu kursor di atas area widget |
+| Fitur | `dwell_hover_ms` | Total waktu kursor di area widget (termasuk modal yang terbuka) |
 | | `mouse_trace_len` | Panjang lintasan kursor di area widget (px) |
-| | `selections` | Jumlah pilihan dibuat atau diganti |
-| | `options_display_ms` | Lama daftar opsi terbuka (W1 saja; radio = selalu terlihat → kosong) |
-| | `first_key_latency_ms` | Fokus input → ketikan pertama (search saja) |
-| | `keystrokes` | Jumlah ketikan karakter dan hapus (search saja) |
+| | `selections` | Jumlah kartu matkul / kartu jadwal yang dipilih |
+| | `options_display_ms` | Lama modal matkul terbuka; `-1` untuk `class_picker` (opsi selalu terlihat) |
+| | `first_key_latency_ms` | Fokus kolom cari → ketikan pertama; `-1` bila tidak mengetik |
+| | `keystrokes` | Jumlah tombol yang ditekan di kolom cari |
 | | `misclicks` | Klik di area widget yang tidak memicu aksi |
-| | `total_ms` | Fokus/interaksi pertama dengan widget → pilihan dikonfirmasi atau berhasil |
-| | `attempts`, `fail_full`, `fail_conflict`, `wrong_pick` | Percobaan dan kegagalan dalam interaksi ini |
-| Kovariat | `order_pos`, `a_full_at_pick`, `got_a`, `input_device` | |
-| Kualitas data | `hidden_ms`, `max_idle_ms`, `rtt_ms`, `cancelled`, `excluded`, `exclusion_reason` | Lihat 8.3 |
-| Validasi | `sus_score` | Skor SUS pasangan widget pada blok tersebut |
+| | `total_ms` | Sentuhan pertama dengan widget → matkul terpilih / kelas berhasil ditambahkan |
+| | `attempts` | Jumlah klik "Simpan" di modal konfirmasi |
+| | `fail_full` | Ditolak karena penuh + klik pada kelas penuh yang nonaktif |
+| | `fail_conflict` | Ditolak karena bentrok + klik pada kelas bentrok yang nonaktif |
+| | `wrong_pick` | Memilih matkul di luar paket (`course_picker`) |
+| Kovariat | `order_pos`, `reserved_before`, `a_full_at_pick`, `got_a` | |
+| Kualitas data | `hidden_ms`, `rtt_ms`, `cancelled`, `excluded`, `exclusion_reason` | Baru (8.3) |
+| Validasi | `sus_score` | Skor SUS blok yang sama |
 
-Definisi metrik di atas wajib disalin ke README dan ke bagian metode laporan.
+Definisi ini wajib disalin ke bagian metode laporan.
 
 ### 8.3 Aturan kualitas data
 Data **tidak dihapus**, melainkan **ditandai** (`excluded` + `exclusion_reason`), sehingga alasan tiap eksklusi bisa dilaporkan:
 
-| Alasan | Aturan (bisa disesuaikan setelah pilot) |
+| Alasan | Aturan (dikalibrasi setelah pilot) |
 |---|---|
+| `practice` | Interaksi pada sesi latihan |
 | `tab_hidden` | `hidden_ms` > 3.000 ms |
 | `idle` | Jeda tanpa event > 30.000 ms |
-| `network` | `rtt_ms` > 2.000 ms pada request ambil kelas |
-| `cancelled` | Kelas dibatalkan setelah diambil |
+| `network` | `rtt_ms` > 2.000 ms |
+| `cancelled` | Kelas dihapus dari KRS setelah diambil |
 | `incomplete` | Interaksi terputus (refresh atau timeout) sebelum SEQ |
 
 ## 9. Kebutuhan non-fungsional
 
 | ID | Kebutuhan |
 |---|---|
-| NF-01 | Menangani 20 klien serentak di jaringan lokal dengan respons ambil kelas < 300 ms |
-| NF-02 | Tidak ada instalasi di sisi peserta; cukup browser desktop modern |
+| NF-01 | Menangani 20 klien serentak dengan respons tambah kelas < 300 ms |
+| NF-02 | Tanpa instalasi di sisi peserta; browser desktop modern |
 | NF-03 | Anonim: tidak ada nama, NIM, atau email; hanya kode peserta |
-| NF-04 | Server dijalankan di laptop peneliti (`npm start -- -H 0.0.0.0`) dengan PostgreSQL via Docker |
-| NF-05 | Tampilan desktop minimal 1280 px; peserta wajib memakai mouse (dicatat di demografi) |
-| NF-06 | Aksesibilitas dasar: label terhubung ke input, navigasi keyboard di widget, kontras cukup |
-| NF-07 | Semua route API memvalidasi input dan menangani error (tanpa error 500 yang tidak tertangkap) |
+| NF-04 | Identitas visual netral (tanpa logo dan nama kampus); data mahasiswa di layar fiktif |
+| NF-05 | Server dapat dijangkau semua peserta: laptop peneliti di jaringan lokal **atau** deploy online. Jaringan kampus wajib diuji dulu (client isolation, firewall) |
+| NF-06 | Layar desktop minimal 1280 px; peserta wajib memakai mouse (dicatat) |
+| NF-07 | Semua route API memvalidasi input dan menangani error |
 
 ## 10. Di luar cakupan
-- Integrasi dengan SIAKAD UNS asli atau data mahasiswa asli.
-- Versi mobile.
-- Pelaksanaan remote.
-- Wawancara (bila dilakukan, dijalankan di luar aplikasi).
-- Pemodelan di dalam aplikasi; analisis dilakukan terpisah (lihat 11).
+- Perbandingan beberapa versi desain widget.
+- Integrasi dengan SIAKAD asli atau data mahasiswa asli.
+- Versi mobile dan pelaksanaan remote.
+- Pemodelan di dalam aplikasi (dilakukan terpisah, bagian 11).
 
 ## 11. Deliverable analisis (di luar aplikasi)
 Folder `analysis/` (notebook Python):
 1. Pembersihan data berdasarkan `excluded`, plus laporan jumlah dan alasan eksklusi.
-2. Normalisasi fitur (z-score) dan encoding fitur kategori.
+2. Normalisasi fitur (z-score) dan encoding `widget_type` serta `condition`.
 3. Model: Decision Tree Regressor (`max_depth=5`, `min_samples_leaf=10`) dengan pembanding Linear Regression, Random Forest, dan SVR.
 4. Validasi: `GroupKFold` per `pid` dengan pengulangan; metrik MAE dan R² (H1, H6).
 5. Gini importance per jenis widget (H2).
-6. Wilcoxon signed-rank atau ANOVA repeated-measures dengan effect size (H3, H4).
+6. Wilcoxon signed-rank dengan effect size: antar widget (H3) dan santai vs war (H4).
 7. Korelasi Spearman SEQ–SUS (H5).
 8. Analisis tematik jawaban terbuka.
 
-## 12. Kriteria penerimaan (siap ambil data)
-- [ ] Simulasi 20 klien serentak (script e2e): tidak ada kuota terjual melebihi kapasitas, dan tidak ada error 500.
-- [ ] Satu sesi penuh dapat diselesaikan dalam ≤ 25 menit pada uji pilot.
-- [ ] Setiap interaksi yang selesai menghasilkan satu baris `interactions` dengan `seq` dan event mentahnya.
+## 12. Kriteria siap ambil data
+- [x] Simulasi 12 klien serentak (`npm run e2e`): kuota tidak terjual melebihi kapasitas, bentrok ditolak.
+- [x] Setiap widget yang selesai menghasilkan satu baris `interactions` dengan `seq`.
+- [x] Ronde santai (kuota privat) dan ronde war (kuota bersama) berjalan; diuji `npm run e2e`.
+- [ ] Ronde war dimulai serentak dari admin.
+- [ ] Satu sesi penuh selesai dalam ≤ 20–25 menit pada uji pilot.
 - [ ] Refresh di tengah blok tidak menghilangkan data yang sudah dikonfirmasi.
-- [ ] Kelima jenis CSV dapat diunduh dan cocok dengan kamus data (8.2).
+- [ ] Semua jenis ekspor tersedia dan cocok dengan kamus data (8.2).
 - [ ] Butir SUS sudah diganti versi tervalidasi beserta sitasinya.
+- [ ] Jaringan lokasi sesi sudah diuji, atau aplikasi sudah dideploy online.
 - [ ] Pilot dengan 3–5 orang selesai dan aturan eksklusi sudah dikalibrasi.
 
-## 13. Rencana kerja
+## 13. Progres dan rencana kerja
 
-| Fase | Isi | Kebutuhan |
+| Fase | Isi | Status |
 |---|---|---|
-| 1. Fondasi | Struktur blok, kondisi santai/war, 4 grup counterbalancing, perluasan katalog, pengaturan sesi di admin | F-02, F-10–F-12, F-41, F-46, F-72 |
-| 2. Widget | W1 dropdown/search baru, W2 radio panjang/ringkas, SEQ per widget | F-20–F-23, F-30–F-33, F-50 |
-| 3. War | Ruang tunggu dan mulai serentak, batas waktu, lewati, pembatalan tercatat | F-42–F-45, F-73 |
-| 4. Data | Log event mentah, deteksi tab, RTT, pengiriman andal, ekspor lengkap | F-61–F-65, F-75 |
-| 5. Pelengkap | Demografi, SUS tervalidasi, pertanyaan akhir, monitor admin, polesan UI dan aksesibilitas | F-03, F-04, F-51, F-52, F-74, NF-06 |
-| 6. Uji | Test e2e serentak, pilot 3–5 orang, kalibrasi aturan eksklusi | Bagian 12 |
-| 7. Pengambilan data dan analisis | Sesi utama 15–20 peserta, notebook analisis | Bagian 11 |
+| 0. Prototipe awal | Alur peserta, kuota atomik, tracker, SEQ, SUS, admin, ekspor CSV, test e2e | ✅ Selesai |
+| 1. UI tiru SIAKAD | Kerangka halaman, W1 modal cari + grid, W2 kartu radio jadwal + modal konfirmasi, SEQ per widget, katalog baru | ✅ Selesai |
+| 2. Kondisi | Ronde 1 santai / ronde 2 war ✅; mulai war serentak dari admin, batas waktu, lewati matkul, latihan | Sebagian |
+| 3. Data | Kolom `condition`/`practice`, deteksi tab, RTT, log event, pencatatan pembatalan, ekspor lengkap | |
+| 4. Pelengkap | Demografi, SUS tervalidasi, monitor admin, pengaturan kuota dari admin | |
+| 5. Uji | Uji jaringan lokasi, pilot 3–5 orang, kalibrasi aturan eksklusi | |
+| 6. Pengambilan data dan analisis | Sesi utama 15–20 peserta, notebook analisis | |
 
 ## 14. Risiko
 
 | Risiko | Dampak | Mitigasi |
 |---|---|---|
-| Perbedaan mouse dan touchpad | Fitur mouse tidak sebanding | Wajib mouse; catat `input_device` |
+| SEQ timpang (kebanyakan skor tinggi) karena widget SIAKAD relatif mudah | Model sulit belajar (mengancam H1) | Kursi dibuat langka, ada kelas penuh sejak awal dan bentrok; pantau distribusi SEQ saat pilot |
+| Perbedaan mouse dan touchpad | Fitur mouse tidak sebanding | Wajib mouse; catat perangkat input |
 | Data antar peserta saling bergantung (perebutan kuota) | Asumsi independensi dilanggar | `GroupKFold` per pid; dilaporkan sebagai keterbatasan |
-| Urutan kondisi tetap (santai → war) | Efek belajar bercampur dengan efek kondisi | Blok santai sebagai latihan; dilaporkan sebagai keterbatasan |
-| SEQ 32 kali per sesi | Kelelahan, jawaban asal | SEQ satu klik; pantau distribusi; uji pilot |
+| Urutan kondisi tetap (santai → war) | Efek belajar bercampur dengan efek kondisi | Ada latihan sebelum blok santai; dilaporkan sebagai keterbatasan |
 | Peserta buntu di blok war | Sesi macet | Tombol lewati + batas waktu |
-| WiFi tidak stabil | Ketidakadilan dalam perebutan | Satu jaringan lokal, catat RTT, flag `network` |
-| Jumlah peserta yang hadir berbeda dari rencana | Kelangkaan terlalu ringan atau terlalu berat | Kuota diatur dari admin pada hari H |
-| Waktu pengerjaan tidak cukup | Fitur tidak selesai | Fallback: radio satu versi saja (perbandingan W2 menjadi keterbatasan) |
+| Jaringan kampus memblokir koneksi antar perangkat | Peserta tidak bisa mengakses server | Uji sebelum hari H; cadangan: deploy online atau router sendiri |
+| Jumlah peserta yang hadir berbeda dari rencana | Kelangkaan terlalu ringan atau berat | Sisa kursi diatur dari admin pada hari H |
 
 ## 15. Pertanyaan terbuka
-1. Batas waktu blok war: 5 menit cukup? Tentukan setelah pilot.
-2. SUS cukup 2 kali (per pasangan widget) atau 4 kali (per versi widget)? 4 kali menambah sekitar 3 menit.
-3. Apakah pemilihan W1 juga ikut dihitung sebagai bagian dari "siapa cepat" (kursi baru dipesan di W2)? Saat ini: ya, kursi hanya dipesan di W2.
-4. Sumber dan sitasi SUS versi Indonesia yang dipakai.
+1. ~~Blok santai tetap dipakai?~~ **Diputuskan: ronde 1 santai, ronde 2 war.**
+2. Batas waktu blok war: 5 menit cukup? Tentukan setelah pilot.
+3. Sumber dan sitasi SUS versi Indonesia yang dipakai.
+4. Lokasi sesi dan jaringannya: WiFi kampus, router sendiri, atau deploy online?
