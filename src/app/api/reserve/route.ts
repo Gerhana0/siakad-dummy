@@ -1,14 +1,19 @@
 import { pool, ready } from "@/lib/db";
 import { CONDITION, clash, courseName, getCatalog, isA } from "@/lib/catalog";
+import { normalizePid, parseRound } from "@/lib/util";
+import { handle, readBody } from "@/lib/server";
 
-export async function POST(req: Request) {
-  await ready();
-  const { pid, round, classKey } = await req.json();
-  if (round !== 1 && round !== 2) return Response.json({ ok: false, reason: "error" }, { status: 400 });
+export const POST = handle(async (req) => {
+  const b = await readBody(req);
+  const pid = normalizePid(b.pid);
+  const round = parseRound(b.round);
+  if (!round) return Response.json({ ok: false, reason: "error" }, { status: 400 });
   const cat = getCatalog(round);
-  const cls = cat.find((c) => c.key === classKey);
+  const cls = cat.find((c) => c.key === b.classKey);
   if (!cls) return Response.json({ ok: false, reason: "error" }, { status: 400 });
-  const war = CONDITION[round as 1 | 2] === "war";
+  const classKey = cls.key;
+  const war = CONDITION[round] === "war";
+  await ready();
 
   const client = await pool.connect();
   try {
@@ -28,7 +33,7 @@ export async function POST(req: Request) {
       await client.query("ROLLBACK");
       return Response.json({ ok: false, reason: "already" });
     }
-    const mine = active.rows.map((r) => cat.find((c) => c.key === r.class_key)!);
+    const mine = active.rows.map((r) => cat.find((c) => c.key === r.class_key)).filter((c) => !!c);
     const hit = mine.find((m) => clash(m, cls));
     if (hit) {
       await client.query("ROLLBACK");
@@ -80,4 +85,4 @@ export async function POST(req: Request) {
   } finally {
     client.release();
   }
-}
+});

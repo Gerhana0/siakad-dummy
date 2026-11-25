@@ -1,7 +1,8 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CONDITION, Cls, Course, TARGETS, courseSks, findCourse, getCatalog, isA } from "@/lib/catalog";
 import { postJson } from "@/lib/api";
+import { uid } from "@/lib/util";
 import CoursePicker, { CoursePick } from "./CoursePicker";
 import SchedulePicker, { ClassPick, TryResult } from "./SchedulePicker";
 import SeqModal from "./SeqModal";
@@ -11,10 +12,12 @@ type Props = {
   pid: string;
   round: 1 | 2;
   initialReserved: string[];
-  onDone: () => void;
+  /** Pindah ke tahap berikutnya; false bila gagal disimpan. */
+  onDone: () => Promise<boolean>;
 };
 
-type Pending = { kind: "course"; pick: CoursePick } | { kind: "class"; pick: ClassPick };
+// `id` dikirim sebagai clientId agar pengiriman ulang tidak membuat baris interaksi ganda.
+type Pending = { id: string } & ({ kind: "course"; pick: CoursePick } | { kind: "class"; pick: ClassPick });
 
 const TABS = [
   { icon: "book", label: "Mata Kuliah" },
@@ -84,18 +87,18 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
 
   const onPickCourse = (p: CoursePick) => {
     setCourse(p.course);
-    setPending({ kind: "course", pick: p });
+    setPending({ id: uid(), kind: "course", pick: p });
     setN2((x) => x + 1);
   };
 
   const onPickClass = (p: ClassPick) => {
     setReserved((r) => [...r, p.cls.key]);
-    setPending({ kind: "class", pick: p });
+    setPending({ id: uid(), kind: "class", pick: p });
   };
 
   const submitSeq = async (seq: number) => {
     if (!pending) return;
-    const base = { pid, round, widget: "siakad", seq };
+    const base = { pid, round, seq, clientId: pending.id };
     let body: Record<string, unknown>;
     if (pending.kind === "course") {
       const p = pending.pick;
@@ -137,11 +140,31 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
       setCourse(null);
       setN1((x) => x + 1);
       setN2((x) => x + 1);
-      if (complete) onDone();
     } else {
       setN1((x) => x + 1);
     }
   };
+
+  // Selesai ronde: otomatis sekali saat KRS lengkap dan tidak ada SEQ yang menunggu. Ini juga
+  // menangani peserta yang me-refresh halaman setelah kelas terakhir tersimpan (dulu macet di sini).
+  const finishing = useRef(false);
+  const autoFinished = useRef(false);
+  const [finishErr, setFinishErr] = useState(false);
+  const finish = async () => {
+    if (finishing.current) return;
+    finishing.current = true;
+    setFinishErr(false);
+    const ok = await onDone();
+    finishing.current = false;
+    if (!ok) setFinishErr(true);
+  };
+  const ready = complete && !pending;
+  useEffect(() => {
+    if (!ready || autoFinished.current) return;
+    autoFinished.current = true;
+    finish();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   const cancel = async (c: Cls) => {
     const r = await postJson<{ ok: boolean }>("/api/release", { pid, round, classKey: c.key });
@@ -213,6 +236,7 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
             locked={!!pending}
             onTry={onTry}
             onSuccess={onPickClass}
+            onRefresh={war ? loadSlots : undefined}
           />
         </div>
       </div>
@@ -222,9 +246,11 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
           <h2>
             <Icon name="checklist" /> KRS Anda
           </h2>
-          <button type="button" className="btn-ghost" onClick={war ? loadSlots : undefined}>
-            <Icon name="refresh" size={16} /> Muat ulang
-          </button>
+          {war && (
+            <button type="button" className="btn-ghost" onClick={loadSlots}>
+              <Icon name="refresh" size={16} /> Muat ulang
+            </button>
+          )}
         </div>
         <div className="sks-row">
           <span>SKS diambil</span>
@@ -262,9 +288,22 @@ export default function Round({ pid, round, initialReserved, onDone }: Props) {
             ))}
           </ul>
         )}
-        <button type="button" className="btn block" disabled>
-          <Icon name="print" size={18} /> Cetak KRS
-        </button>
+        {ready ? (
+          <>
+            {finishErr && (
+              <p role="alert" className="alert-err">
+                Gagal menyimpan. Periksa koneksi lalu tekan Lanjut lagi.
+              </p>
+            )}
+            <button type="button" className="btn block" onClick={finish}>
+              <Icon name="check" size={18} /> KRS lengkap, lanjut
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn block" disabled>
+            <Icon name="print" size={18} /> Cetak KRS
+          </button>
+        )}
       </aside>
 
       {pending && (

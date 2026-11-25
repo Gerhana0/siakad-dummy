@@ -5,7 +5,7 @@ import SusForm from "@/components/SusForm";
 import Shell, { Brand, ProfileCard } from "@/components/Shell";
 import { postJson } from "@/lib/api";
 import { CONDITION } from "@/lib/catalog";
-import { Stage } from "@/lib/util";
+import type { Stage } from "@/lib/util";
 
 type Participant = {
   pid: string;
@@ -33,13 +33,13 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
 
   const setStage = async (stage: Stage) => {
-    const r = await postJson<{ ok: boolean }>("/api/stage", { pid: p!.pid, stage });
+    const r = await postJson<{ ok: boolean; stage?: Stage }>("/api/stage", { pid: p!.pid, stage });
     if (!r?.ok) {
       setError("Gagal menyimpan. Periksa koneksi lalu coba lagi.");
       return false;
     }
     setError("");
-    setP({ ...p!, stage });
+    setP({ ...p!, stage: r.stage ?? stage });
     return true;
   };
 
@@ -151,7 +151,7 @@ export default function Home() {
           key={r}
           round={r}
           onSubmit={async (answers) => {
-            const res = await postJson<{ ok: boolean }>("/api/sus", { pid: p.pid, round: r, widget: "siakad", answers });
+            const res = await postJson<{ ok: boolean }>("/api/sus", { pid: p.pid, round: r, answers });
             if (!res?.ok) {
               setError("Jawaban belum tersimpan. Periksa koneksi lalu tekan Lanjut lagi.");
               return;

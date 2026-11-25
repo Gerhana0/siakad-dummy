@@ -7,7 +7,13 @@ import Icon from "./Icon";
 export type TryResult =
   | { ok: true; aFull: boolean; reservedBefore: number }
   | { ok: false; reason: "full" | "conflict" | "already" | "error"; detail?: string };
-export type Counters = { attempts: number; failFull: number; failConflict: number };
+export type Counters = {
+  attempts: number; // jumlah klik Simpan
+  failFull: number; // Simpan ditolak server: kursi habis (keduluan peserta lain)
+  failConflict: number; // Simpan ditolak server: bentrok
+  clickFull: number; // klik pada kelas yang sudah tampil penuh (nonaktif)
+  clickConflict: number; // klik pada kelas yang sudah tampil bentrok (nonaktif)
+};
 export type ClassPick = {
   cls: Cls;
   res: Extract<TryResult, { ok: true }>;
@@ -23,6 +29,8 @@ type Props = {
   locked: boolean;
   onTry: (c: Cls) => Promise<TryResult>;
   onSuccess: (p: ClassPick) => void;
+  /** Muat ulang kuota dari server (ronde war). */
+  onRefresh?: () => void;
 };
 
 /** Pesan bentrok bergaya SIAKAD. */
@@ -39,23 +47,24 @@ function clashMessage(c: Cls, mine: Cls[]) {
  * Widget 2 (class_picker): daftar kartu radio jadwal kelas paralel, lalu modal "Konfirmasi mata kuliah"
  * (Tutup / Simpan) seperti SIAKAD. Kelas bentrok dan penuh dinonaktifkan. Satu interaksi = dari
  * sentuhan pertama sampai kelas berhasil disimpan ke KRS. `attempts` = jumlah klik Simpan.
- * Klik pada kelas nonaktif dihitung sebagai fail_conflict / fail_full.
+ * Klik pada kelas nonaktif dihitung sebagai click_full / click_conflict; penolakan server saat Simpan
+ * dihitung sebagai fail_full / fail_conflict.
  */
-export default function SchedulePicker({ course, classes, mine, taken, locked, onTry, onSuccess }: Props) {
+export default function SchedulePicker({ course, classes, mine, taken, locked, onTry, onSuccess, onRefresh }: Props) {
   const tr = useTracker();
   const [picked, setPicked] = useState<Cls | null>(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const cnt = useRef<Counters>({ attempts: 0, failFull: 0, failConflict: 0 });
+  const cnt = useRef<Counters>({ attempts: 0, failFull: 0, failConflict: 0, clickFull: 0, clickConflict: 0 });
 
   const filled = (c: Cls) => Math.min(taken[c.key] ?? c.initialTaken, c.quota);
   const sorted = [...classes].sort((a, b) => a.day - b.day || a.slot - b.slot);
 
   const choose = (c: Cls, disabledBy: "" | "full" | "conflict") => {
     if (locked) return;
-    if (disabledBy === "conflict") cnt.current.failConflict++;
-    if (disabledBy === "full") cnt.current.failFull++;
+    if (disabledBy === "conflict") cnt.current.clickConflict++;
+    if (disabledBy === "full") cnt.current.clickFull++;
     if (disabledBy) return;
     tr.markSelect();
     setPicked(c);
@@ -83,6 +92,7 @@ export default function SchedulePicker({ course, classes, mine, taken, locked, o
     if (res.reason === "full") {
       cnt.current.failFull++;
       setMsg(`Kelas ${picked.code} sudah penuh. Silakan pilih jadwal kelas lain.`);
+      onRefresh?.(); // tampilkan kuota terbaru sekarang, jangan tunggu polling berikutnya
     } else if (res.reason === "conflict") {
       cnt.current.failConflict++;
       setMsg(`Jadwal bentrok dengan ${res.detail ?? "kelas yang sudah diambil"}.`);
